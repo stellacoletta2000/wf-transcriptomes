@@ -540,16 +540,37 @@ process publish_results {
 
 
 // Check ref_annotation transcript strand column for "." if in de_analysis mode
-process check_annotation_strand {
+process filter_unstranded_annotation {
     label "isoforms"
     cpus 1
     memory "2 GB"
     input:
         path "ref_annotation.gtf"
     output:
-        tuple stdout, path("ref_annotation.gtf")   
+        tuple stdout, path("ref_annotation_stranded.gtf")   
+
+    script:
     """
-    awk '{if (\$3=="transcript" && \$7 != "+" && \$7 != "-") print \$3, \$7}' "ref_annotation.gtf"
+    awk '
+        BEGIN { OFS = "\\t" }
+        /^#/ { print; next }
+    # Valid strands
+    (\$7 == "+" || \$7 == "-") { print; next }
+
+    # Invalid strand
+    {
+        print \$0 >> "unstranded.gtf"
+    }
+    ' ref_annotation.gtf > ref_annotation_stranded.gtf
+
+    # Check and log warning if unstranded entries exist
+    if [ -s unstranded.gtf ]; then
+        echo "Warning: Unstranded entries found and excluded from differential expression analysis.
+        If running with reference-guided transcriptome source, consider increasing read depth to reduce unstranded annotations.
+        If running with precomputed transcriptome source, ensure your ref_annotation gtf file contains only '+' or '-' strand entries."
+        echo "A sample of unstranded entries:"
+        head -n 20 unstranded.gtf
+    fi
     """
 }
 
@@ -727,12 +748,6 @@ workflow pipeline {
         }
         if (params.de_analysis){
             sample_sheet = file(params.sample_sheet, type:"file")
-            // check ref annotation contains only + or - strand as DE analysis will error on .
-            check_annotation_strand(ref_annotation).map { stdoutput, annotation ->
-            // check if there was an error message
-            if (stdoutput) error "In ref_annotation, transcript features must have a strand of either '+' or '-'."
-                    stdoutput
-                }
             if (!params.ref_transcriptome){
                 validate_ref_annotation(ref_annotation, ref_genome).map { stdoutput ->
                     if (stdoutput) {
@@ -751,7 +766,19 @@ workflow pipeline {
                 transcriptome = preprocess_ref_transcriptome(transcriptome)
                 gtf = ref_annotation
             }
-            de = differential_expression(transcriptome, full_len_reads.map{ sample_id, reads -> [[alias:sample_id], reads]}, sample_sheet, gtf)
+            // Filter out any .(unstranded) records
+            // only + or - strand allowed for DE analysis.
+            stranded_annotation = filter_unstranded_annotation(gtf)
+                .map{ stdoutput, annotation -> annotation
+                    if (stdoutput) {
+                        log.warn(stdoutput)
+                    }
+                annotation
+                }
+            de = differential_expression(
+                transcriptome,
+                full_len_reads.map{ sample_id, fq_reads -> [[alias:sample_id], fq_reads]},
+                sample_sheet, stranded_annotation)
             de_report = de.all_de
             de_outputs = de.de_outputs
             de_alignment_stats = de.de_alignment_stats
