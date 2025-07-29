@@ -6,20 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Updated to wf-template v5.6.1, changing:
+- Updated to wf-template v5.6.2, changing:
     - Reduce verbosity of debug logging from fastcat which can occasionally occlude errors found in FASTQ files during ingress.
     - Log banner art to say "EPI2ME" instead of "EPI2ME Labs" to match current branding. This has no effect on the workflow outputs.
     - pre-commit configuration to resolve an internal dependency problem with flake8. This has no effect on the workflow.
     - Stringtie updated to v2.2.3, which fixes stalling at transcriptome assembly step.
     - Gffcompare updated to v0.12.6, which fixes issue where ref_gene_id was assigned an nan value.
 ### Fixed
-- Updated to wf-template v5.6.1, fixing:
+- Updated to wf-template v5.6.2, fixing:
     - dacite.exceptions.WrongTypeError during report generation when barcode is null.
     - Sequence summary read length N50 incorrectly displayed minimum read length, it now correctly shows the N50.
     - Sequence summary component alignment and coverage plots failed to plot under some conditions.
 - Error in `deAnalysis` process - `mode(counts) %in% "numeric" is not TRUE` - caused by hyphens in sample sheet aliases.
 - Error in `deAnalysis` process - `values in 'transcripts$tx_strand' must be "+" or "-"`.
   - The workflow will now filter out any unstranded annotations from downstream analysis and log a warning.
+- Output the `results_dexseq.tsv` file when `--de_analysis` enabled.
 
 ## [v1.7.0]
 ### Changed

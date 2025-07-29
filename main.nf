@@ -919,6 +919,7 @@ workflow pipeline {
                 Channel.of(null), // igv locus
                 [displayMode: "SQUISHED", colorBy: "strand"], // bam extra opts
                 Channel.of(null), // vcf extra opts
+                Channel.of(false), // keep_track_order opts
                 )
 
             results = results.concat(igv_conf.map{ [it, null]})
