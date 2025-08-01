@@ -21,8 +21,8 @@ suppressMessages(library("edgeR"))
 # Some functions, including dmDSdata, converts '.' in sample IDs to '-'. 
 # Make the output DF match the sample IDs in the sample sheet
 # start_col is the index of the first sample column in the data frame
-rename_sample_columns <- function(df, sample_ids, start_col) {
-  colnames(df)[start_col:ncol(df)] <- sample_ids
+rename_sample_columns <- function(df, alias, start_col) {
+  colnames(df)[start_col:ncol(df)] <- alias
   return(df)
 }
 
@@ -37,13 +37,14 @@ if (!dir.exists(argv$merged_out_dir)){
 cat("Loading counts, conditions and parameters.\n")
 cts <- as.matrix(read.csv(argv$all_counts, sep="\t", row.names="Reference", stringsAsFactors=FALSE, check.names=FALSE))
 # Set up sample data frame:
-#changed this to sample_id
 coldata <- read.csv(argv$sample_sheet, row.names="alias", sep=",", stringsAsFactors=TRUE, check.names=FALSE)
+coldata$alias <- rownames(coldata)
+#dmDSdata looks up sample_id in coldata, we need this to be sample alias
+coldata$sample_id <- coldata$alias
 
-coldata$sample_id <- rownames(coldata)
 # Reorder the input counts columns to match the sample sheet order. 
 # This ensures we don't missassign column names, when renaming output DF columns.
-cts <- cts[, coldata$sample_id, drop = FALSE]
+cts <- cts[, coldata$alias, drop = FALSE]
 # check if control condition exists, sets as reference 
 if(!"control" %in% coldata$condition)
   stop("sample_sheet.csv does not contain 'control' 
@@ -101,9 +102,10 @@ rownames(txdf) <- NULL
 # Create counts data frame:
 counts<-data.frame(gene_id=txdf$GENEID, feature_id=txdf$TXNAME, cts)
 
-counts <- rename_sample_columns(counts, coldata$sample_id, 3)
+counts <- rename_sample_columns(counts, coldata$alias, 3)
 # output unfiltered version of the counts table now we have paired transcripts with gene ids
 write.table(counts, file=file.path(argv$de_out_dir, "unfiltered_transcript_counts_with_genes.tsv"), sep="\t", row.names = FALSE, quote=FALSE)
+
 
 cat("Filtering counts using DRIMSeq.\n")
 
@@ -122,13 +124,13 @@ suppressMessages(library("dplyr"))
 # Sum transcript counts into gene counts:
 cat("Sum transcript counts into gene counts.\n")
 trs_cts <- counts(d)
-trs_cts <- rename_sample_columns(trs_cts, coldata$sample_id, 3)
+trs_cts <- rename_sample_columns(trs_cts, coldata$alias, 3)
 write.table(trs_cts, file=file.path(argv$merged_out_dir, "filtered_transcript_counts_with_genes.tsv"), sep="\t", row.names = FALSE, quote=FALSE)
 
 gene_cts <- trs_cts_unfiltered %>% dplyr::select(c(1, 3:ncol(trs_cts)))  %>% group_by(gene_id) %>% summarise_all(tibble::lst(sum)) %>% data.frame()
 rownames(gene_cts) <- gene_cts$gene_id
 gene_cts$gene_id <- NULL
-gene_cts <- rename_sample_columns(gene_cts, coldata$sample_id, 1)
+gene_cts <- rename_sample_columns(gene_cts, coldata$alias, 1)
 write.table(gene_cts, file=file.path(argv$merged_out_dir, "all_gene_counts.tsv"), sep="\t", quote=FALSE)
 
 # Output count per million of the gene counts using edgeR CPM
@@ -137,7 +139,7 @@ cpm_gene_counts <- cpm(gene_cts)
 cpm_gene_counts <- cbind(var_name = rownames(cpm_gene_counts), cpm_gene_counts)
 rownames(cpm_gene_counts) <- NULL
 colnames(cpm_gene_counts)[1] <- "gene_id"
-cpm_gene_counts <- rename_sample_columns(cpm_gene_counts, coldata$sample_id, 2)
+cpm_gene_counts <- rename_sample_columns(cpm_gene_counts, coldata$alias, 2)
 write.table(cpm_gene_counts, file=file.path(argv$de_out_dir, "cpm_gene_counts.tsv"), sep="\t", quote=FALSE, row.names = FALSE)
 
 # Differential gene expression using edgeR:
