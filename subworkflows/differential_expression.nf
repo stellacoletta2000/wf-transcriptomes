@@ -78,6 +78,7 @@ process deAnalysis {
         path "de_analysis/results_dtu_stageR.tsv", emit: dtu_stageR
         path "de_analysis/results_dtu.pdf", emit: dtu_pdf
         path "de_analysis/cpm_gene_counts.tsv", emit: cpm
+    script:
     """
     de_analysis.R \
         --annotation annotation.gtf \
@@ -91,11 +92,13 @@ process deAnalysis {
         --merged_out_dir merged
 
     # Check that the original aliases in the input TSV have not been mangled by R's read.csv or other functions
-    head -1 all_counts.tsv | cut -f2- | tr '\t' '\n'   > expected_colnames
+    # Sample column order should be in the same order as the input sample sheet
+    alias_col=\$(awk -v RS=',' '/alias/{print NR; exit}' "sample_sheet.csv")
+    cut -d',' -f3 sample_sheet.csv | tail -n +2 | paste -sd '\t' - | sed 's/\t*\$//' > expected_colnames
     
-    head -1 de_analysis/cpm_gene_counts.tsv | cut -f2- | tr '\t' '\n'  > cpm_gene_counts_colnames
-    head -1 merged/all_gene_counts.tsv | tr '\t' '\n'  > merged_counts_colnames
-    head -1 merged/filtered_transcript_counts_with_genes.tsv | cut -f3- | tr '\t' '\n' > merged_filtered_colnames
+    head -1 de_analysis/cpm_gene_counts.tsv | cut -f2-  > cpm_gene_counts_colnames
+    head -1 merged/all_gene_counts.tsv  > merged_counts_colnames
+    head -1 merged/filtered_transcript_counts_with_genes.tsv | cut -f3-  > merged_filtered_colnames
     
     # Check for mismatches in sample column names
     for file in cpm_gene_counts_colnames merged_counts_colnames merged_filtered_colnames; do
