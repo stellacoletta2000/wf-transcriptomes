@@ -1,4 +1,4 @@
-# Workflow Transcriptomes
+# Transcriptomes
 
 Transcriptome analysis of cDNA and direct RNA sequencing data.
 
