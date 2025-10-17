@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [v1.7.2]
+This patch release of wf-transcriptomes updates internal workflow naming, and does not affect any workflow outputs.
 ### Changed
 - Removed workflow suffix from workflow title. This has no effect on the workflow.
 
