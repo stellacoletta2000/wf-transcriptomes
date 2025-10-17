@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.7.2]
+### Changed
+- Removed workflow suffix from workflow title. This has no effect on the workflow.
+
 ## [v1.7.1]
 ### Changed
 - Updated to wf-template v5.6.2, changing:
