@@ -844,15 +844,17 @@ workflow pipeline {
 
        results = results.map{ [it, null] }.concat(fastq_ingress_results.map { [it, "fastq_ingress_results"] })
 
-        if (params.de_analysis){
-           de_results = report.concat(
-            transcriptome, de_outputs.flatten(),
-            makeReport.out.results_dge,  makeReport.out.tpm,
-            makeReport.out.filtered,  makeReport.out.unfiltered,
-            makeReport.out.gene_counts)
-            // Output de_analysis results in the dedicated directory.
-            results = results.concat(de_results.map{ [it, "de_analysis"] })
-        }
+        if (params.de_analysis && !params.skip_deseq2){
+   de_results = report.concat(
+    transcriptome, de_outputs.flatten(),
+    makeReport.out.results_dge,  makeReport.out.tpm,
+    makeReport.out.filtered,  makeReport.out.unfiltered,
+    makeReport.out.gene_counts)
+    // Output de_analysis results in the dedicated directory.
+    results = results.concat(de_results.map{ [it, "de_analysis"] })
+} else {
+    log.info("Skipping DESeq2 results export — DESeq2 disabled or not executed.")
+}
 
 
         results.concat(workflow_params.map{ [it, null]})
