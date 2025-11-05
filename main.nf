@@ -746,7 +746,7 @@ workflow pipeline {
             transcriptome_summary = OPTIONAL_FILE
             use_ref_ann = false
         }
-        if (params.de_analysis){
+        if (params.de_analysis && !params.skip_deseq2) {
             sample_sheet = file(params.sample_sheet, type:"file")
             if (!params.ref_transcriptome){
                 validate_ref_annotation(ref_annotation, ref_genome).map { stdoutput ->
@@ -783,6 +783,7 @@ workflow pipeline {
             de_outputs = de.de_outputs
             de_alignment_stats = de.de_alignment_stats
         } else{
+			log.info "Skipping differential expression analysis (DESeq2)..."
             de_report = OPTIONAL_FILE
             de_alignment_stats = OPTIONAL_FILE
         }
