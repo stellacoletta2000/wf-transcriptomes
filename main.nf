@@ -746,7 +746,7 @@ workflow pipeline {
             transcriptome_summary = OPTIONAL_FILE
             use_ref_ann = false
         }
-        if (params.de_analysis && !params.skip_deseq2) {
+        if (params.de_analysis) {
             sample_sheet = file(params.sample_sheet, type:"file")
             if (!params.ref_transcriptome){
                 validate_ref_annotation(ref_annotation, ref_genome).map { stdoutput ->
@@ -766,27 +766,36 @@ workflow pipeline {
                 transcriptome = preprocess_ref_transcriptome(transcriptome)
                 gtf = ref_annotation
             }
-            // Filter out any .(unstranded) records
-            // only + or - strand allowed for DE analysis.
-            stranded_annotation = filter_unstranded_annotation(gtf)
-                .map{ stdoutput, annotation -> annotation
-                    if (stdoutput) {
-                        log.warn(stdoutput)
-                    }
-                annotation
-                }
-            de = differential_expression(
-                transcriptome,
-                full_len_reads.map{ sample_id, fq_reads -> [[alias:sample_id], fq_reads]},
-                sample_sheet, stranded_annotation)
-            de_report = de.all_de
-            de_outputs = de.de_outputs
-            de_alignment_stats = de.de_alignment_stats
-        } else{
-			log.info "Skipping differential expression analysis (DESeq2)..."
-            de_report = OPTIONAL_FILE
-            de_alignment_stats = OPTIONAL_FILE
+             // Filter out any .(unstranded) records
+    // only + or - strand allowed for DE analysis.
+    stranded_annotation = filter_unstranded_annotation(gtf)
+        .map{ stdoutput, annotation ->
+            if (stdoutput) {
+                log.warn(stdoutput)
+            }
+            annotation
         }
+
+    // ⬇️ AGGIUNTA PERSONALIZZATA: controllo opzionale DESeq2
+    if (params.skip_deseq2) {
+        log.warn("Skipping DESeq2 step: running only up to Salmon quantification.")
+        de_report = OPTIONAL_FILE
+        de_alignment_stats = OPTIONAL_FILE
+        de_outputs = OPTIONAL_FILE
+    } else {
+        // Original DESeq2 section — esegue la DE analysis
+        de = differential_expression(
+            transcriptome,
+            full_len_reads.map{ sample_id, fq_reads -> [[alias:sample_id], fq_reads]},
+            sample_sheet, stranded_annotation)
+        de_report = de.all_de
+        de_outputs = de.de_outputs
+        de_alignment_stats = de.de_alignment_stats
+    }
+} else {
+    de_report = OPTIONAL_FILE
+    de_alignment_stats = OPTIONAL_FILE
+}
 
         // get metadata and stats files, keeping them ordered (could do with transpose I suppose)
         reads.multiMap{ meta, path, index, stats ->
