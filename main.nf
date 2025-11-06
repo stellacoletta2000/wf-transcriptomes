@@ -534,9 +534,11 @@ process publish_results {
         tuple path(fname), val(dirname)
     output:
         path fname
+    script:                  // 
     """
     """
 }
+
 
 
 // Check ref_annotation transcript strand column for "." if in de_analysis mode
