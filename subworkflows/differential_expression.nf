@@ -4,8 +4,13 @@ process checkSampleSheetCondition {
     memory "2 GB"
     input:
         path "sample_sheet.csv"
+    script:
     """
-    workflow-glue check_sample_sheet_condition "sample_sheet.csv"
+    if workflow-glue check_sample_sheet_condition "sample_sheet.csv"; then
+        echo "Sample sheet condition check passed."
+    else
+        echo "⚠️ Warning: insufficient replicates per condition — DESeq2 will be skipped, but Salmon quantification will continue."
+    fi
     """
 }
 
@@ -175,31 +180,60 @@ process map_transcriptome{
 
 workflow differential_expression {
     take:
-       ref_transcriptome
-       full_len_reads
-       sample_sheet
-       ref_annotation
+        ref_transcriptome
+        full_len_reads
+        sample_sheet
+        ref_annotation
+
     main:
         sample_sheet = Channel.fromPath(sample_sheet)
-        checkSampleSheetCondition(sample_sheet)
+
+        // ⚙️ Esegui il controllo solo se non stai saltando la DE
+        if (!params.skip_deseq2) {
+            checkSampleSheetCondition(sample_sheet)
+        } else {
+            log.warn "⚠️ Skipping DESeq2 condition check — proceeding only up to Salmon quantification."
+        }
+
+        // 🧬 Step comuni: mapping, quantificazione, merge
         t_index = build_minimap_index_transcriptome(ref_transcriptome)
-        mapped = map_transcriptome(full_len_reads.combine(t_index)
-        .map{meta, fastq, reference, transcriptome -> tuple(meta, fastq, reference) })
-        count_transcripts(mapped.bam.combine(t_index.map{ mmi, reference -> reference}))
+        mapped = map_transcriptome(
+            full_len_reads.combine(t_index)
+                .map { meta, fastq, reference, transcriptome -> tuple(meta, fastq, reference) }
+        )
+
+        count_transcripts(mapped.bam.combine(t_index.map { mmi, reference -> reference }))
         merged = mergeCounts(count_transcripts.out.counts.collect())
         merged_TPM = mergeTPM(count_transcripts.out.counts.collect())
-        analysis = deAnalysis(sample_sheet, merged, ref_annotation)
-        plotResults(analysis.flt_counts, analysis.stageR, sample_sheet)
-        // Concat files required for making the report
-        de_report = analysis.flt_counts.concat(
-            analysis.gene_counts, analysis.dge, analysis.dexseq,
-            analysis.stageR, sample_sheet, merged, ref_annotation, merged_TPM, analysis.unflt_counts).collect()
-        // Concat files required to be output to user without any changes
-        de_outputs_concat = analysis.cpm.concat(analysis.dexseq, plotResults.out.dtu_plots, analysis.dge_pdf, analysis.dge_tsv,
-        analysis.dtu_gene, analysis.dtu_transcript, analysis.dtu_stageR, analysis.dtu_pdf, merged_TPM).collect()
+
+        if (!params.skip_deseq2) {
+            // 🧩 Analisi differenziale (solo se ci sono abbastanza campioni)
+            analysis = deAnalysis(sample_sheet, merged, ref_annotation)
+            plotResults(analysis.flt_counts, analysis.stageR, sample_sheet)
+
+            de_report = analysis.flt_counts.concat(
+                analysis.gene_counts, analysis.dge, analysis.dexseq,
+                analysis.stageR, sample_sheet, merged, ref_annotation, merged_TPM, analysis.unflt_counts
+            ).collect()
+
+            de_outputs_concat = analysis.cpm.concat(
+                analysis.dexseq, plotResults.out.dtu_plots, analysis.dge_pdf, analysis.dge_tsv,
+                analysis.dtu_gene, analysis.dtu_transcript, analysis.dtu_stageR, analysis.dtu_pdf, merged_TPM
+            ).collect()
+        } else {
+            // 🚫 Skip DESeq2 e stageR: fermati a Salmon
+            de_report = merged_TPM.collect()
+            de_outputs_concat = merged_TPM.collect()
+        }
+
         collected_de_alignment_stats = mapped.align_stats.collect()
-emit:
-       all_de = de_report
+
+    emit:
+        all_de = de_report
+        de_alignment_stats = collected_de_alignment_stats
+        de_outputs = de_outputs_concat
+}
+
        de_alignment_stats = collected_de_alignment_stats
        de_outputs = de_outputs_concat
 }
