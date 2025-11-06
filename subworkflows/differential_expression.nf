@@ -185,10 +185,9 @@ workflow differential_expression {
         sample_sheet
         ref_annotation
 
-    main:
+        main:
         sample_sheet = Channel.fromPath(sample_sheet)
 
-        // ⚙️ Esegui il controllo solo se non stai saltando la DE
         if (!params.skip_deseq2) {
             checkSampleSheetCondition(sample_sheet)
         } else {
@@ -202,26 +201,32 @@ workflow differential_expression {
                 .map { meta, fastq, reference, transcriptome -> tuple(meta, fastq, reference) }
         )
 
-        count_transcripts(mapped.bam.combine(t_index.map { mmi, reference -> reference }))
-        merged = mergeCounts(count_transcripts.out.counts.collect())
-        merged_TPM = mergeTPM(count_transcripts.out.counts.collect())
+        // ✅ CORRETTO: salva output di count_transcripts
+        counted = count_transcripts(
+            mapped.bam.combine(t_index.map { mmi, reference -> reference })
+        )
+
+        merged = mergeCounts(counted.out.counts.collect())
+        merged_TPM = mergeTPM(counted.out.counts.collect())
 
         if (!params.skip_deseq2) {
-            // 🧩 Analisi differenziale (solo se ci sono abbastanza campioni)
+            // 🧩 Analisi differenziale
             analysis = deAnalysis(sample_sheet, merged, ref_annotation)
             plotResults(analysis.flt_counts, analysis.stageR, sample_sheet)
 
             de_report = analysis.flt_counts.concat(
                 analysis.gene_counts, analysis.dge, analysis.dexseq,
-                analysis.stageR, sample_sheet, merged, ref_annotation, merged_TPM, analysis.unflt_counts
+                analysis.stageR, sample_sheet, merged, ref_annotation,
+                merged_TPM, analysis.unflt_counts
             ).collect()
 
             de_outputs_concat = analysis.cpm.concat(
-                analysis.dexseq, plotResults.out.dtu_plots, analysis.dge_pdf, analysis.dge_tsv,
-                analysis.dtu_gene, analysis.dtu_transcript, analysis.dtu_stageR, analysis.dtu_pdf, merged_TPM
+                analysis.dexseq, plotResults.out.dtu_plots, analysis.dge_pdf,
+                analysis.dge_tsv, analysis.dtu_gene, analysis.dtu_transcript,
+                analysis.dtu_stageR, analysis.dtu_pdf, merged_TPM
             ).collect()
         } else {
-            // 🚫 Skip DESeq2 e stageR: fermati a Salmon
+            // 🚫 Skip DESeq2 e StageR: fermati a Salmon
             de_report = merged_TPM.collect()
             de_outputs_concat = merged_TPM.collect()
         }
@@ -232,7 +237,7 @@ workflow differential_expression {
         all_de = de_report
         de_alignment_stats = collected_de_alignment_stats
         de_outputs = de_outputs_concat
-}
+
 
        de_alignment_stats = collected_de_alignment_stats
        de_outputs = de_outputs_concat
