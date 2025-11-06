@@ -40,6 +40,7 @@ process count_transcripts {
         path "*transcript_counts.tsv", emit: counts
     script:
     """
+    echo ">>> Running Salmon quantification for \${meta.alias}"
     salmon quant --noErrorModel -p "${task.cpus}" -t "${ref_transcriptome}" -l SF -a "${bam}" -o counts
     mv counts/quant.sf "${meta.alias}.transcript_counts.tsv"
     """
@@ -69,7 +70,7 @@ process mergeTPM {
         path "unfiltered_tpm_transcript_counts.tsv"
     script:
     """
-    workflow-glue merge_count_tsvs -o unfiltered_tpm_transcript_counts.tsv -z -tpm True -tsvs ${counts}
+    workflow-glue merge_count_tsvs -o unfiltered_tpm_transcript_counts.tsv -z -tpm True -tsvs $counts
     """
 }
 
