@@ -776,26 +776,23 @@ workflow pipeline {
             annotation
         }
 
-    // ⬇️ AGGIUNTA PERSONALIZZATA: controllo opzionale DESeq2
-    if (params.skip_deseq2) {
-        log.warn("Skipping DESeq2 step: running only up to Salmon quantification.")
-        de_report = OPTIONAL_FILE
-        de_alignment_stats = OPTIONAL_FILE
-        de_outputs = OPTIONAL_FILE
-    } else {
-        // Original DESeq2 section — esegue la DE analysis
-        de = differential_expression(
-            transcriptome,
-            full_len_reads.map{ sample_id, fq_reads -> [[alias:sample_id], fq_reads]},
-            sample_sheet, stranded_annotation)
-        de_report = de.all_de
-        de_outputs = de.de_outputs
-        de_alignment_stats = de.de_alignment_stats
-    }
-} else {
-    de_report = OPTIONAL_FILE
-    de_alignment_stats = OPTIONAL_FILE
+    // Avviso a log, ma NON blocchiamo la subworkflow
+if (params.skip_deseq2) {
+    log.warn("Skipping DESeq2 step: running only up to Salmon quantification.")
 }
+
+// ➜ Chiama SEMPRE la subworkflow: lo skip lo gestiamo al suo interno
+de = differential_expression(
+    transcriptome,
+    full_len_reads.map{ sample_id, fq_reads -> [[alias:sample_id], fq_reads] },
+    sample_sheet,
+    stranded_annotation
+)
+
+// Normalizziamo sempre le variabili d’uscita
+de_report          = de.all_de
+de_outputs         = de.de_outputs
+de_alignment_stats = de.de_alignment_stats
 
         // get metadata and stats files, keeping them ordered (could do with transpose I suppose)
         reads.multiMap{ meta, path, index, stats ->
