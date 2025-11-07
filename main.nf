@@ -616,7 +616,7 @@ process gz_faidx {
     """
     samtools faidx ${ref}
     """
-
+    }
 
 
 // workflow module
