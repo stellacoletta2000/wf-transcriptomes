@@ -768,12 +768,13 @@ workflow pipeline {
             // Filter out any .(unstranded) records
             // only + or - strand allowed for DE analysis.
             stranded_annotation = filter_unstranded_annotation(gtf)
-                .map{ stdoutput, annotation -> annotation
-                    if (stdoutput) {
-                        log.warn(stdoutput)
-                    }
-                annotation
-                }
+   			.map { stdoutput, annotation ->
+            if (stdoutput) {
+            log.warn(stdoutput)
+        }
+        return annotation
+        }
+
             de = differential_expression(
                 transcriptome,
                 full_len_reads.map{ sample_id, fq_reads -> [[alias:sample_id], fq_reads]},
