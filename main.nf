@@ -772,7 +772,7 @@ workflow pipeline {
             if (stdoutput) {
             log.warn(stdoutput)
         }
-        return annotation
+        annotation
         }
 
             de = differential_expression(
